@@ -1,0 +1,175 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: opa-policy
+  namespace: demo-apps
+data:
+  policy.rego: |
+    package envoy.authz
+
+    import input.attributes.request.http as http_request
+    import input.attributes.source as source
+
+    # Default deny all requests
+    default allow = false
+
+    # Detailed decision logging
+    decision_log = {
+        "allowed": allow,
+        "reason": reason,
+        "user": user_info,
+        "service": service_info,
+        "request": request_info
+    }
+
+    # Extract user information from JWT
+    user_info := {
+        "username": token.payload.preferred_username,
+        "email": token.payload.email,
+        "roles": token.payload.realm_access.roles
+    } {
+        token.payload
+    }
+
+    # Extract service information from SPIFFE ID
+    service_info := {
+        "spiffe_id": source.principal,
+        "trusted": is_trusted_service
+    }
+
+    # Extract request information
+    request_info := {
+        "method": http_request.method,
+        "path": http_request.path,
+        "headers": http_request.headers
+    }
+
+    # JWT token extraction
+    token := {"payload": payload} {
+        [_, encoded] := split(http_request.headers.authorization, " ")
+        [_, payload, _] := io.jwt.decode(encoded)
+    }
+
+    # Check if user has specific role
+    has_role(role) {
+        token.payload.realm_access.roles[_] == role
+    }
+
+    # Check if service is trusted
+    is_trusted_service {
+        startswith(source.principal, "spiffe://${TRUST_DOMAIN}/frontend")
+    }
+
+    # Get document security level from header
+    doc_security_level := level {
+        level := http_request.headers["x-doc-security-level"]
+    }
+
+    doc_security_level := "Public" {
+        not http_request.headers["x-doc-security-level"]
+    }
+
+    # ============================================
+    # RULE 1: Health checks (no auth)
+    # ============================================
+    allow {
+        http_request.path == "/health"
+    }
+
+    reason := "Health check endpoint" {
+        http_request.path == "/health"
+    }
+
+    # ============================================
+    # RULE 2: Metrics endpoint (no auth)
+    # ============================================
+    allow {
+        http_request.path == "/api/spiffe-debug"
+    }
+
+    reason := "Metrics endpoint" {
+        http_request.path == "/api/spiffe-debug"
+    }
+
+    # ============================================
+    # RULE 3: Managers can access everything
+    # ============================================
+    allow {
+        has_role("manager")
+        is_trusted_service
+    }
+
+    reason := "Manager role with full access" {
+        has_role("manager")
+        is_trusted_service
+    }
+
+    # ============================================
+    # RULE 4: Employees can access public documents
+    # ============================================
+    allow {
+        # User must have employee role
+        has_role("employee")
+
+        # Request must come from trusted service
+        is_trusted_service
+
+        # Document must be public
+        doc_security_level == "Public"
+
+        # Path must be documents endpoint
+        startswith(http_request.path, "/api/documents")
+    }
+
+    reason := "Employee accessing public documents" {
+        has_role("employee")
+        is_trusted_service
+        doc_security_level == "Public"
+        startswith(http_request.path, "/api/documents")
+    }
+
+    # ============================================
+    # RULE 5: Block employees from admin endpoint
+    # ============================================
+    allow = false {
+        has_role("employee")
+        startswith(http_request.path, "/api/admin")
+    }
+
+    reason := "Employees cannot access admin endpoints" {
+        has_role("employee")
+        startswith(http_request.path, "/api/admin")
+    }
+
+    # ============================================
+    # RULE 6: Block access to confidential documents for employees
+    # ============================================
+    allow = false {
+        has_role("employee")
+        doc_security_level == "Confidential"
+    }
+
+    reason := "Employees cannot access confidential documents" {
+        has_role("employee")
+        doc_security_level == "Confidential"
+    }
+
+    # ============================================
+    # RULE 7: Block requests from untrusted services
+    # ============================================
+    allow = false {
+        not is_trusted_service
+        not http_request.path == "/health"
+        not http_request.path == "/api/spiffe-debug"
+    }
+
+    reason := "Request from untrusted service" {
+        not is_trusted_service
+        not http_request.path == "/health"
+        not http_request.path == "/api/spiffe-debug"
+    }
+
+    # Default reason for denials
+    reason := "No matching authorization rule" {
+        not allow
+    }

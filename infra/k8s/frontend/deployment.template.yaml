@@ -1,0 +1,93 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: demo-apps
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+        spire-workload: "true"
+    spec:
+      serviceAccountName: frontend-service
+      containers:
+      # Nginx frontend container
+      - name: frontend
+        image: ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${PROJECT_NAME}-frontend:latest
+        ports:
+        - containerPort: 80
+        volumeMounts:
+        - name: frontend-nginx-config
+          mountPath: /etc/nginx/conf.d
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 80
+          initialDelaySeconds: 10
+          periodSeconds: 10
+
+      # Envoy sidecar for mTLS to backend
+      - name: envoy
+        image: envoyproxy/envoy:v1.29-latest
+        args:
+        - -c
+        - /etc/envoy/envoy.yaml
+        - --log-level
+        - info
+        - --service-node
+        - frontend
+        - --service-cluster
+        - demo-apps
+        ports:
+        - containerPort: 15000
+          name: admin
+        volumeMounts:
+        - name: frontend-envoy-config
+          mountPath: /etc/envoy
+        - name: spire-agent-socket
+          mountPath: /run/spire/sockets
+          readOnly: true
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+
+      volumes:
+      - name: frontend-nginx-config
+        configMap:
+          name: frontend-nginx-config
+      - name: frontend-envoy-config
+        configMap:
+          name: frontend-envoy-config
+      - name: spire-agent-socket
+        csi:
+          driver: csi.spiffe.io
+          readOnly: true
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+  namespace: demo-apps
+spec:
+  type: ClusterIP
+  ports:
+  - port: 80
+    targetPort: 80
+  selector:
+    app: frontend

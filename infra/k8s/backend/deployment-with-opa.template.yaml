@@ -1,0 +1,161 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: demo-apps
+  labels:
+    app: backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+        spire-workload: "true"
+    spec:
+      serviceAccountName: backend-service
+      containers:
+      # Application container
+      - name: backend
+        image: ${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/zero-trust-backend:v2  # Update with: scripts/build-and-push-backend.sh
+        ports:
+        - containerPort: 3000
+          name: http
+        env:
+        - name: PORT
+          value: "3000"
+        - name: NODE_ENV
+          value: "production"
+        volumeMounts:
+        - name: spire-agent-socket
+          mountPath: /run/spire/sockets
+          readOnly: true
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+
+      # Envoy sidecar
+      - name: envoy
+        image: envoyproxy/envoy:v1.29-latest
+        args:
+        - -c
+        - /etc/envoy/envoy.yaml
+        - --log-level
+        - info
+        - --service-node
+        - backend
+        - --service-cluster
+        - demo-apps
+        ports:
+        - containerPort: 8080
+          name: https
+        - containerPort: 15000
+          name: admin
+        volumeMounts:
+        - name: envoy-config
+          mountPath: /etc/envoy
+        - name: spire-agent-socket
+          mountPath: /run/spire/sockets
+          readOnly: true
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+
+      # OPA sidecar
+      - name: opa
+        image: openpolicyagent/opa:0.60.0-envoy
+        args:
+        - "run"
+        - "--server"
+        - "--addr=localhost:8181"
+        - "--diagnostic-addr=0.0.0.0:8282"
+        - "--set=plugins.envoy_ext_authz_grpc.addr=:9191"
+        - "--set=plugins.envoy_ext_authz_grpc.path=envoy/authz/allow"
+        - "--set=decision_logs.console=true"
+        - "--ignore=.*"
+        - "/policies/policy.rego"
+        ports:
+        - containerPort: 9191
+          name: grpc
+        - containerPort: 8181
+          name: http
+        - containerPort: 8282
+          name: diagnostic
+        volumeMounts:
+        - name: opa-policy
+          mountPath: /policies
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        livenessProbe:
+          httpGet:
+            path: /health?plugins
+            port: 8282
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        readinessProbe:
+          httpGet:
+            path: /health?plugins
+            port: 8282
+          initialDelaySeconds: 5
+          periodSeconds: 5
+
+      volumes:
+      - name: envoy-config
+        configMap:
+          name: envoy-config
+      - name: opa-policy
+        configMap:
+          name: opa-policy
+      - name: spire-agent-socket
+        csi:
+          driver: csi.spiffe.io
+          readOnly: true
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+  namespace: demo-apps
+  labels:
+    app: backend
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8080
+    targetPort: 8080
+    protocol: TCP
+    name: https
+  - port: 3000
+    targetPort: 3000
+    protocol: TCP
+    name: http
+  selector:
+    app: backend

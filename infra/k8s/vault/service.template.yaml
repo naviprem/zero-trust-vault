@@ -1,0 +1,40 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: vault
+  namespace: ${VAULT_NAMESPACE}
+  labels:
+    app.kubernetes.io/name: vault
+spec:
+  type: ClusterIP
+  publishNotReadyAddresses: false
+  ports:
+  - name: http
+    port: 8200
+    targetPort: 8200
+  - name: https-internal
+    port: 8201
+    targetPort: 8201
+  selector:
+    app.kubernetes.io/name: vault
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vault-internal
+  namespace: ${VAULT_NAMESPACE}
+  labels:
+    app.kubernetes.io/name: vault
+spec:
+  type: ClusterIP
+  clusterIP: None
+  publishNotReadyAddresses: true
+  ports:
+  - name: http
+    port: 8200
+    targetPort: 8200
+  - name: https-internal
+    port: 8201
+    targetPort: 8201
+  selector:
+    app.kubernetes.io/name: vault

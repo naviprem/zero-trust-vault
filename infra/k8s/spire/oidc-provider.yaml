@@ -1,0 +1,61 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: spire-oidc-provider
+  namespace: spire-system
+spec:
+  selector:
+    app: spire-oidc-provider
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: spire-oidc-provider
+  namespace: spire-system
+  labels:
+    app: spire-oidc-provider
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: spire-oidc-provider
+  template:
+    metadata:
+      labels:
+        app: spire-oidc-provider
+    spec:
+      containers:
+      - name: spire-oidc-provider
+        image: ghcr.io/spiffe/oidc-discovery-provider:1.8.0
+        args:
+        - -config
+        - /run/spire/config/oidc-discovery-provider.conf
+        ports:
+        - containerPort: 8080
+          name: http
+        volumeMounts:
+        - name: config
+          mountPath: /run/spire/config
+          readOnly: true
+      volumes:
+      - name: config
+        configMap:
+          name: oidc-discovery-provider
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: oidc-discovery-provider
+  namespace: spire-system
+data:
+  oidc-discovery-provider.conf: |
+    log_level = "info"
+    insecure_addr = "0.0.0.0:8080"
+    server_api {
+      address = "spire-server:8081"
+    }
+    domains = ["spire-oidc-provider.spire-system.svc.cluster.local"]

@@ -1,0 +1,98 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+.venv
+
+# Results and outputs
+results_*.json
+comparison.csv
+comparison.png
+*.log
+
+# AWS config files
+*.pem
+.env
+
+# Generated Kubernetes manifests (keep templates, ignore generated files)
+infra/k8s/**/*namespace.yaml
+infra/k8s/**/*configmap.yaml
+infra/k8s/**/*secret.yaml
+infra/k8s/**/*deployment.yaml
+infra/k8s/**/*statefulset.yaml
+infra/k8s/**/*daemonset.yaml
+infra/k8s/**/*service.yaml
+infra/k8s/**/*serviceaccount.yaml
+infra/k8s/**/*rbac.yaml
+infra/k8s/**/*ingress.yaml
+infra/k8s/**/*crds.yaml
+infra/k8s/**/*ingressclass.yaml
+infra/k8s/**/*webhook.yaml
+infra/k8s/**/*storageclass.yaml
+infra/k8s/**/*issuer.yaml
+infra/k8s/**/*certificate.yaml
+infra/k8s/spire/csi-driver.yaml
+
+# OPA-specific generated files
+infra/k8s/opa/configmap.yaml
+infra/k8s/envoy/envoy-config-with-opa.yaml
+infra/k8s/backend/deployment-with-opa.yaml
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# Backup files
+*.bak
+*.backup
+k8s/*.bak
+CLAUDE.md
+archive/
+Makefile
+docs/
+nyc-taxi-data/
+
+# Local .terraform directories
+**/.terraform/*
+
+# .tfstate files
+*.tfstate
+*.tfstate.*
+
+# Crash log files
+crash.log
+
+# Exclude all .tfvars files, which are likely to contain sensitive data
+*.tfvars
+*.tfvars.json
+
+# Ignore override files
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+
+infra/k8s/vault/service.yaml
+
+# Node modules
+node_modules/
+**/node_modules/
+
+infra/terraform/tfplan

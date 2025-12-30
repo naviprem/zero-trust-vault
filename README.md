@@ -23,7 +23,7 @@
 * **Tasks:**
   * Deploy **Keycloak**; configure `manager` and `employee` roles.
   * Initialize **SPIRE**; attest a "Backend" service based on its Docker/Linux UID.
-  * **The CTO Challenge:** Connect SPIRE to **HashiCorp Vault**. Ensure the Backend can only fetch its DB credentials by proving its identity via a SPIFFE SVID.
+  * **The Challenge:** Connect SPIRE to **HashiCorp Vault**. Ensure the Backend can only fetch its DB credentials by proving its identity via a SPIFFE SVID.
 
 ### Goal 2: The Decoupled Data Plane
 
@@ -31,7 +31,7 @@
 * **Tasks:**
   * Deploy **Envoy Proxy** as a sidecar for your services.
   * Configure Envoy to handle **mTLS** automatically using certificates from SPIRE.
-  * **The CTO Challenge:** Implement "Strict mTLS." Verify that any request without a valid SVID—even from within the network—is dropped before reaching the app.
+  * **The Challenge:** Implement "Strict mTLS." Verify that any request without a valid SVID—even from within the network—is dropped before reaching the app.
 
 ### Goal 3: Fine-Grained Authorization (Policy-as-Code)
 
@@ -39,18 +39,18 @@
 * **Tasks:**
   * Deploy **OPA** as a sidecar.
   * Write a **Rego policy** that validates the Keycloak JWT (User) + SPIFFE ID (Service).
-  * **The CTO Challenge:** Implement an Attribute-Based Access Control (ABAC) rule: *"Employees can only access documents if the document's 'Security-Level' is 'Public' AND the request originates from a 'Trusted' internal service."*
+  * **The Challenge:** Implement an Attribute-Based Access Control (ABAC) rule: *"Employees can only access documents if the document's 'Security-Level' is 'Public' AND the request originates from a 'Trusted' internal service."*
 
 ### Goal 4: Observability & Governance
 
 * **Objective:** Provide "Board-Level" visibility into the security posture.
 * **Tasks:**
   * Use **eBPF (Cilium)** to map all service communications.
-  * **The CTO Challenge:** Simulate a lateral movement attack. Use your observability tools to prove that the architecture detected and blocked the unauthorized path at the kernel level.
+  * **The Challenge:** Simulate a lateral movement attack. Use your observability tools to prove that the architecture detected and blocked the unauthorized path at the kernel level.
 
 ---
 
-## Blog Framing (CTO Perspective)
+## Blog Framing (Perspective)
 
 **Primary Tagline:** *"Journey into the Mechanics of Zero Trust: A 20-Year Veteran’s Blueprint."*
 
